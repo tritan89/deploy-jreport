@@ -1,0 +1,164 @@
+- name: Deploy standalone JReport 15.6 instance for dq203
+  hosts: jreport_new
+  become: true
+  vars:
+    jreport_http_port: 8888
+    jreport_rmi_port: 1129
+    jreport_jmx_port: 8881
+    jreport_min_mem_mb: 24576
+    jreport_rmi_host: "{{ ansible_default_ipv4.address }}"
+    jreport_sysdb_host: dbilotw.dq203.aws.bclc.com
+    jreport_datadb_host: dbilotr.dq203.aws.bclc.com
+    jreport_cluster_name: jreport-cluster-dq203
+    jreport_jgroups_mcast_port: 45688
+    jreport_start_service: false
+  vars_files:
+    - vault.yml
+
+  pre_tasks:
+    - name: Assert host has enough memory for 20G heap
+      assert:
+        that:
+          - ansible_memtotal_mb >= jreport_min_mem_mb
+        fail_msg: "Host has {{ ansible_memtotal_mb }}MB, JReport is configured for a 20480MB fixed heap"
+
+    - name: Check dq203 system DB is reachable
+      wait_for:
+        host: "{{ jreport_sysdb_host }}"
+        port: 3306
+        timeout: 10
+
+    - name: Check dq203 data DB is reachable
+      wait_for:
+        host: "{{ jreport_datadb_host }}"
+        port: 3306
+        timeout: 10
+
+    - name: Check required ports are free
+      wait_for:
+        port: "{{ item }}"
+        state: stopped
+        timeout: 5
+      loop:
+        - "{{ jreport_http_port }}"
+        - "{{ jreport_rmi_port }}"
+        - "{{ jreport_jmx_port }}"
+
+  tasks:
+    - name: Extract JDK
+      unarchive:
+        src: files/jdk1.8.0.tar.gz
+        dest: /opt
+        creates: /opt/jdk1.8.0/bin/java
+
+    - name: Extract JReport server
+      unarchive:
+        src: files/jreport-server.tar.gz
+        dest: /opt
+        creates: /opt/JReport/Server/bin/JRServer.sh
+
+    - name: Extract JReport artifacts
+      unarchive:
+        src: files/jreport-artifacts.tar.gz
+        dest: /opt
+        creates: /opt/jreport_artifacts/patches
+
+    - name: Recreate runtime directories excluded from the tarball
+      file:
+        path: "/opt/JReport/Server/{{ item }}"
+        state: directory
+        mode: "0750"
+      loop:
+        - logs
+        - temp
+        - history
+
+    - name: Set RMI host to this server's IP
+      lineinfile:
+        path: /opt/JReport/Server/bin/server.properties
+        regexp: '^server\.rmi\.host='
+        line: "server.rmi.host={{ jreport_rmi_host }}"
+
+    - name: Set distinct cluster name to avoid joining dq201 cluster
+      lineinfile:
+        path: /opt/JReport/Server/bin/server.properties
+        regexp: '^cluster\.name='
+        line: "cluster.name={{ jreport_cluster_name }}"
+
+    - name: Set distinct jgroups multicast port to isolate from dq201 discovery
+      replace:
+        path: /opt/JReport/Server/bin/jgroups.xml
+        regexp: 'mcast_port="\$\{jgroups\.udp\.mcast_port:\d+\}"'
+        replace: 'mcast_port="${jgroups.udp.mcast_port:{{ jreport_jgroups_mcast_port }}}"'
+
+    - name: Deploy dbconfig pointing at dq203 databases
+      template:
+        src: templates/dbconfig.xml.j2
+        dest: /opt/JReport/Server/bin/dbconfig.xml
+        mode: "0600"
+        backup: true
+
+    - name: Deploy datasource pointing at dq203 replica
+      template:
+        src: templates/datasource.xml.j2
+        dest: /opt/JReport/Server/bin/datasource.xml
+        mode: "0600"
+        backup: true
+
+    - name: Remove stale dq201 backup configs carried in tarball
+      file:
+        path: "/opt/JReport/Server/bin/{{ item }}"
+        state: absent
+      loop:
+        - dbconfig_bak.xml
+        - datasource_bak.xml
+        - server.properties.bak
+
+    - name: Ensure startup scripts are executable
+      file:
+        path: "{{ item }}"
+        mode: "0755"
+      loop:
+        - /opt/JReport/Server/bin/JRServer.sh
+        - /opt/JReport/Server/bin/stopServer.sh
+
+    - name: Restore SELinux contexts on install trees
+      command: restorecon -R /opt/JReport /opt/jdk1.8.0
+      changed_when: false
+      failed_when: false
+
+    - name: Install systemd unit
+      copy:
+        src: files/jreport.service
+        dest: /etc/systemd/system/jreport.service
+        mode: "0644"
+
+    - name: Open firewall ports
+      firewalld:
+        port: "{{ item }}/tcp"
+        permanent: true
+        immediate: true
+        state: enabled
+      loop:
+        - "{{ jreport_http_port }}"
+        - "{{ jreport_rmi_port }}"
+        - "{{ jreport_jmx_port }}"
+      failed_when: false
+
+    - name: Enable jreport service
+      systemd:
+        name: jreport
+        enabled: true
+        daemon_reload: true
+
+    - name: Start jreport
+      systemd:
+        name: jreport
+        state: started
+      when: jreport_start_service
+
+    - name: Wait for HTTP port
+      wait_for:
+        port: "{{ jreport_http_port }}"
+        timeout: 180
+      when: jreport_start_service

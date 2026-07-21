@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dbconfig>
+    <workspace name="systemRealm">
+        <database name="systemtables">
+            <url>jdbc:mysql://{{ jreport_sysdb_host }}:3306/jreportsystem?autoReconnect=true&amp;useSSL=false</url>
+            <encrypt-sign>{{ jreport_sysdb_sign }}</encrypt-sign>
+            <driver>com.mysql.cj.jdbc.Driver</driver>
+        </database>
+    </workspace>
+    <workspace name="defaultRealm">
+        <database name="realmtables">
+            <url>jdbc:mysql://{{ jreport_sysdb_host }}:3306/jreportrealm?autoReconnect=true&amp;useSSL=false</url>
+            <encrypt-sign>{{ jreport_realmdb_sign }}</encrypt-sign>
+            <driver>com.mysql.cj.jdbc.Driver</driver>
+        </database>
+        <database name="profile">
+            <url>jdbc:mysql://{{ jreport_sysdb_host }}:3306/jreportprofiling?autoReconnect=true&amp;useSSL=false</url>
+            <encrypt-sign>{{ jreport_profiledb_sign }}</encrypt-sign>
+            <driver>com.mysql.cj.jdbc.Driver</driver>
+        </database>
+    </workspace>
+</dbconfig>

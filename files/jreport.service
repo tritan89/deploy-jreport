@@ -1,0 +1,11 @@
+[Unit]
+Description=JReport v15.6 service
+After=network.target
+
+[Service]
+ExecStart=/opt/JReport/Server/bin/JRServer.sh
+ExecStop=/opt/JReport/Server/bin/stopServer.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

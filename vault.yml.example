@@ -1,0 +1,4 @@
+jreport_sysdb_sign: "REPLACE_WITH_ENCRYPT_SIGN"
+jreport_realmdb_sign: "REPLACE_WITH_ENCRYPT_SIGN"
+jreport_profiledb_sign: "REPLACE_WITH_ENCRYPT_SIGN"
+jreport_datadb_sign: "REPLACE_WITH_ENCRYPT_SIGN"
