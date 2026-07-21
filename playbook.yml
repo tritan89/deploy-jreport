@@ -16,34 +16,6 @@
     - vault.yml
 
   pre_tasks:
-    - name: Assert host has enough memory for 20G heap
-      assert:
-        that:
-          - ansible_memtotal_mb >= jreport_min_mem_mb
-        fail_msg: "Host has {{ ansible_memtotal_mb }}MB, JReport is configured for a 20480MB fixed heap"
-
-    - name: Check dq203 system DB is reachable
-      wait_for:
-        host: "{{ jreport_sysdb_host }}"
-        port: 3306
-        timeout: 10
-
-    - name: Check dq203 data DB is reachable
-      wait_for:
-        host: "{{ jreport_datadb_host }}"
-        port: 3306
-        timeout: 10
-
-    - name: Check required ports are free
-      wait_for:
-        port: "{{ item }}"
-        state: stopped
-        timeout: 5
-      loop:
-        - "{{ jreport_http_port }}"
-        - "{{ jreport_rmi_port }}"
-        - "{{ jreport_jmx_port }}"
-
   tasks:
     - name: Extract JDK
       unarchive:
@@ -79,26 +51,26 @@
         regexp: '^server\.rmi\.host='
         line: "server.rmi.host={{ jreport_rmi_host }}"
 
-    - name: Set distinct cluster name to avoid joining dq201 cluster
+    - name: Set cluster name 
       lineinfile:
         path: /opt/JReport/Server/bin/server.properties
         regexp: '^cluster\.name='
         line: "cluster.name={{ jreport_cluster_name }}"
 
-    - name: Set distinct jgroups multicast port to isolate from dq201 discovery
+    - name: Set jgroups multicast port 
       replace:
         path: /opt/JReport/Server/bin/jgroups.xml
         regexp: 'mcast_port="\$\{jgroups\.udp\.mcast_port:\d+\}"'
         replace: 'mcast_port="${jgroups.udp.mcast_port:{{ jreport_jgroups_mcast_port }}}"'
 
-    - name: Deploy dbconfig pointing at dq203 databases
+    - name: Deploy dbconfig 
       template:
         src: templates/dbconfig.xml.j2
         dest: /opt/JReport/Server/bin/dbconfig.xml
         mode: "0600"
         backup: true
 
-    - name: Deploy datasource pointing at dq203 replica
+    - name: Deploy datasource 
       template:
         src: templates/datasource.xml.j2
         dest: /opt/JReport/Server/bin/datasource.xml
