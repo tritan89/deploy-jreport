@@ -16,9 +16,9 @@ Then copy all three into `files/` on the control machine (run from the repo root
 
 ```
 mkdir -p files
-scp tlanger@10.123.2.141:/tmp/jreport-server.tar.gz files/
-scp tlanger@10.123.2.141:/tmp/jdk1.8.0.tar.gz files/
-scp tlanger@10.123.2.141:/tmp/jreport-artifacts.tar.gz files/
+scp tlanger@10.123.0.141:/tmp/jreport-server.tar.gz files/
+scp tlanger@10.123.0.141:/tmp/jdk1.8.0.tar.gz files/
+scp tlanger@10.123.0.141:/tmp/jreport-artifacts.tar.gz files/
 ```
 
 Once copied, `files/` should contain `jreport.service` plus the three tarballs. Then optionally remove the staged copies on dq201 (`sudo rm /tmp/jreport-server.tar.gz /tmp/jdk1.8.0.tar.gz /tmp/jreport-artifacts.tar.gz`).
@@ -52,10 +52,3 @@ Verify config on the target, then start:
 ```
 ansible-playbook -i inventory.ini playbook.yml --ask-vault-pass -e jreport_start_service=true
 ```
-
-## Open items
-
-- License: `jslc.dat` ships in the tarball but JReport licenses may be host-locked. Confirm entitlement covers a second instance.
-- jgroups.xml uses UDP multicast discovery (PING) on the default `mcast_port` 45588, which dq201 also uses. The playbook overrides `cluster.name` (so nodes won't merge) and sets a distinct `mcast_port` (`jreport_jgroups_mcast_port`, default 45688) so dq203 won't even exchange discovery traffic with dq201 on a shared segment.
-- Confirm whether SSL (port 6888, keystore in bin/) should be enabled on the new instance.
-- Additional datasource blocks: only L10_BCLC was captured. If the real datasource.xml has more entries, extend the template.

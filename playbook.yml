@@ -15,7 +15,6 @@
   vars_files:
     - vault.yml
 
-  pre_tasks:
   tasks:
     - name: Extract JDK
       unarchive:
@@ -104,18 +103,6 @@
         src: files/jreport.service
         dest: /etc/systemd/system/jreport.service
         mode: "0644"
-
-    - name: Open firewall ports
-      firewalld:
-        port: "{{ item }}/tcp"
-        permanent: true
-        immediate: true
-        state: enabled
-      loop:
-        - "{{ jreport_http_port }}"
-        - "{{ jreport_rmi_port }}"
-        - "{{ jreport_jmx_port }}"
-      failed_when: false
 
     - name: Enable jreport service
       systemd:
